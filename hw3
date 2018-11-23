@@ -1,0 +1,128 @@
+(* hw3.sml*)
+
+exception NoAnswer
+
+datatype pattern = Wildcard
+		 | Variable of string
+		 | UnitP
+		 | ConstP of int
+		 | TupleP of pattern list
+		 | ConstructorP of string * pattern
+
+datatype valu = Const of int
+	      | Unit
+	      | Tuple of valu list
+	      | Constructor of string * valu
+
+fun g f1 f2 p =
+    let
+	val r = g f1 f2
+    in
+	case p of
+	    Wildcard          => f1 ()
+	  | Variable x        => f2 x
+	  | TupleP ps         => List.foldl (fn (p,i) => (r p) + i) 0 ps
+	  | ConstructorP(_,p) => r p
+	  | _                 => 0
+    end
+
+(**** for the challenge problem only ****)
+
+datatype typ = Anything
+	     | UnitT
+	     | IntT
+	     | TupleT of typ list
+	     | Datatype of string
+
+(**** you can put all your code here ****)
+
+fun only_capitals (xs) =
+    List.filter (fn str=> Char.isUpper (String.sub(str,0))) xs;
+
+fun longest_string1 (xs) =
+   foldl (fn (a, b) => if String.size(a) > String.size(b) then a else b) "" xs
+
+fun longest_string2 (xs) =
+   foldl (fn (a, b) => if String.size(a) >= String.size(b) then a else b) "" xs
+
+fun longest_string_helper f = fn xs=>
+		case xs of
+		    [] => ""
+		  | head::(neck::rest) => if f (String.size(head), String.size(neck)) then longest_string1 (xs) else longest_string2 (xs)
+
+val longest_string3 = longest_string_helper (fn (a,b)=> a >= b)
+
+val longest_string4 = longest_string_helper (fn (a,b)=> a < b)
+
+val longest_capitalized = longest_string1  o only_capitals
+
+val rev_string = implode o rev o explode
+
+fun first_answer f = fn gs =>
+		      case gs of
+			  [] => raise NoAnswer
+			| x::xs => case f (x) of
+				       SOME i => i
+				    | NONE => first_answer f (xs)
+
+
+fun all_answers f = fn gs =>
+			let fun loop (acc, xs_left) =
+						    case xs_left of
+							[] => SOME acc
+						      | x::xs => case f (x) of
+								     SOME [i] => loop(acc @ [i], xs)
+								   | SOME [] => loop(acc, xs)
+								   | NONE => NONE
+			in
+			    loop([], gs)
+			end
+
+val count_wildcards = fn pattern => g (fn ()=> 1) (fn(s) => 0) pattern
+
+val count_wild_and_variable_lengths = fn pattern => g (fn ()=> 1) (fn(s) => size s) pattern
+
+
+fun count_some_var (string, pattern) =
+    g (fn ()=> 0) (fn(s) => if s = string then 1 else 0) pattern
+
+fun check_pat (pattern) =
+    let fun return_s_list (p) =
+	    case p of
+		Wildcard          => []
+	      | Variable x        => [x]
+	      | TupleP ps         => List.foldl (fn (p, acc) => acc @ return_s_list(p)) [] ps
+	      | ConstructorP(_,p) => []
+	      | _                 => []
+	fun no_duplicates (origlist) =
+	    let fun remove_duplicates (list) =
+		    case list of
+			[] => []
+		      | x::xs => x::remove_duplicates(List.filter (fn y => y <> x) xs)
+	    in
+		(List.length (origlist)) = (List.length (remove_duplicates (origlist)))
+	    end
+    in
+	no_duplicates(return_s_list(pattern))
+    end
+
+fun match (value, pattern) =
+    case (value, pattern) of
+	(_, Variable str) => SOME [(str, value)]
+      | (_, Wildcard) => SOME []
+      | (Unit, UnitP) => SOME []
+      | (_, UnitP) => NONE
+      | (Const x, ConstP y) => if x = y
+			       then SOME []
+			       else NONE
+      | (_, ConstP x) => NONE
+      | (Tuple vs, TupleP ps) => let val list_of_pairs =  ListPair.zip (vs, ps)
+				 in
+				     all_answers (fn p=> match(p)) list_of_pairs
+				 end
+      | (Constructor (s2,v), ConstructorP (s1,p)) => if s1 = s2 andalso match(v,p) <> NONE then match(v,p) else NONE
+      | (_,_) => NONE
+
+
+fun first_match v = fn patterns=>
+		       SOME (first_answer (fn p => match (v,p)) patterns) handle NoAnswer => NONE

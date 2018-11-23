@@ -1,0 +1,203 @@
+(*hw2.sml*)
+
+(* if you use this function to compare two strings (returns true if the same
+   string), then you avoid several of the functions in problem 1 having
+   polymorphic types that may be confusing *)
+fun same_string(s1 : string, s2 : string) =
+    s1 = s2
+
+(* put your solutions for problem 1 here *)
+
+
+fun remove_string_from_list (lst, string, newList) =
+    case lst of
+	[] => newList
+      | x::xs => if same_string(x, string) = true then remove_string_from_list (xs, string, newList) else remove_string_from_list (xs, string, newList @ [x])
+
+fun all_except_option (string, stringList) =
+
+    let fun str_in_lst (str, strLst) =
+	case strLst of
+	[] => NONE
+	 | x::xs => if same_string(x, str) then SOME (remove_string_from_list(stringList, str, [])) else str_in_lst (str, xs)
+    in
+	str_in_lst(string, stringList)
+    end
+
+(* the helper function in this code is unnecessary
+after code review, a more clean function would have looked like this:
+
+fun all_except_option (s,xs) =
+  case xs of
+      [] => NONE
+    | x::xs' => if same_string(s,x)
+                then SOME xs'
+                else case all_except_option(s,xs') of
+                         NONE => NONE
+                       | SOME y => SOME(x::y)
+
+ *)
+
+fun get_substitutions1 (stringlistList, string) =
+    case stringlistList of
+	[] => []
+      | h::t => let fun remove_string_f_list head_list  =
+			case all_except_option (string, head_list) of
+			    NONE => []
+			 | SOME lst => lst
+		in remove_string_f_list (h)  @ get_substitutions1 (t, string)
+		end
+
+fun get_substitutions2 (stringlistList, string) =
+    let fun aux(stringlistList, string, acc) =
+	    case stringlistList of
+		[] => acc
+	       | h::t => let fun remove_string_f_list head_list  =
+				 case all_except_option (string, head_list) of
+				     NONE => []
+				   | SOME lst => lst
+			 in remove_string_f_list (h)  @ aux(t, string, acc)
+							   (* remove_string_f_list(h) @ acc*)
+			 end
+    in aux(stringlistList, string, [])
+    end
+
+fun get_array_of_first_names (stringlistList, x) =
+
+    let val y =
+	    get_substitutions2 (stringlistList, x)
+
+    in [x] @ y
+    end
+
+fun add_name_to_object (arr_of_firsts, middlename, lastname) =
+    case arr_of_firsts of
+	[] => []
+     |  firstname::otherfirsts => [{first=firstname, middle=middlename, last=lastname}] @ add_name_to_object (otherfirsts, middlename, lastname)
+
+fun similar_names (stringlistlist, {first=x,middle=y,last=z}) =
+
+    add_name_to_object (get_array_of_first_names(stringlistlist, x), y, z)
+
+
+
+(* you may assume that Num is always used with values 2, 3, ..., 10
+   though it will not really come up *)
+datatype suit = Clubs | Diamonds | Hearts | Spades
+datatype rank = Jack | Queen | King | Ace | Num of int
+type card = suit * rank
+
+datatype color = Red | Black
+datatype move = Discard of card | Draw
+
+exception IllegalMove
+exception NoMatchingCardException
+
+(* put your solutions for problem 2 here *)
+
+fun card_color (card) =
+    case card of
+	(Clubs, _) => Black
+      | (Spades,_) => Black
+      | (Diamonds,_) => Red
+      | (Hearts,_) => Red
+
+fun card_value (card) =
+    case card of
+	(_, Num i) => i
+      | (_, Ace) => 11
+      | (_, Jack) => 10
+      | (_, Queen) => 10
+      | (_, King) => 10
+
+
+fun remove_element_from_list (lst, element) =
+
+    let val r = []
+	fun remove_el_from_list (l, el, rmvd)  =
+	    case l of
+		[] => l
+	      | x::xs => if x = el andalso rmvd = [] then remove_el_from_list(xs, el, x::rmvd) else x::remove_el_from_list(xs, element, rmvd)
+    in
+
+	remove_el_from_list (lst, element, r)
+
+    end
+
+fun remove_card (cs, c, ex) =
+    let fun remove (cards, card, ex) =
+    case cards of
+	[] => raise ex
+      | h::t => if h = card then remove_element_from_list(cards, h)  else h::remove (t, card, ex)
+
+    in
+	remove(cs, c, ex)
+    end
+
+fun same_color (card1,card2) =
+    card_color(card1) = card_color(card2)
+
+fun all_same_color (cs) =
+    case cs of
+	[] => true
+      | _::[] => true
+      | head::(neck::rest) => (same_color(head, neck) andalso all_same_color (neck::rest))
+
+fun sum_cards cs =
+    let fun f (cs, acc) =
+	    case cs of
+		[] => acc
+	      | c::cs' => f(cs', card_value(c)+acc)
+    in
+	f(cs,0)
+    end
+
+fun score (cs, goal) =
+
+    let val sum = sum_cards(cs)
+	val same_color = all_same_color(cs)
+    in
+	case (sum > goal, same_color) of
+	    (true, false) => (3 * (sum - goal))
+	  | (false, false) => (goal - sum)
+	  | (true, true) => ( (3 * (sum - goal)) div 2)
+	  | (false, true) => ( (goal - sum) div 2)
+    end
+
+
+
+exception OutOfMoves
+exception CardListEmpty of card list
+
+fun officiate (card_list, move_list, goal) =
+    let
+	fun get_next_move (move_list) =
+	    case move_list of
+		[] => raise OutOfMoves
+	      | h::t => h
+
+	fun return_tail_movelist (move_list) =
+	    case move_list of
+		[] => raise OutOfMoves
+	      | h::t => t
+
+	fun process_move (move, cardlist, heldcards) =
+	    case (move, cardlist, heldcards) of
+		(Draw, [], h::t) => raise IllegalMove
+	      | (Draw, h::t, heldcards) => (remove_card(cardlist, h, NoMatchingCardException), heldcards @ [h])
+	      | (Draw, _, _) => raise IllegalMove
+	      | (Discard card, [], heldcards) => raise IllegalMove
+	      | (Discard card, h::t, heldcards) => (cardlist, remove_card(heldcards, card, NoMatchingCardException)) handle NoMatchingCardException => raise IllegalMove
+
+
+	fun evaluate (mvlist, crdlst, hldcrds) =
+	    case process_move(get_next_move(mvlist), crdlst, hldcrds) of
+		([], hc::hcs') => score(hc::hcs', goal)
+	      | (_,[]) => raise IllegalMove
+	      | (h::t, hc::hcs') => if sum_cards(hc::hcs') > goal then score(hc::hcs', goal) else evaluate (return_tail_movelist(mvlist), h::t, hc::hcs') handle OutOfMoves => score(hc::hcs', goal)
+
+		(* newcardlistresult, newheldcardsresult *)
+
+    in
+	evaluate(move_list, card_list, [])
+    end

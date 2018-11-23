@@ -1,0 +1,100 @@
+(*hw1.sml*)
+
+fun is_older (date1 : int*int*int, date2 : int*int*int) =
+    if (#1 date1) < (#1 date2)
+    then true
+    else if (#1 date1) = (#1 date2)
+    then if (#2 date1) < (#2 date2)
+	 then true
+	 else if (#2 date1) = (#2 date2)
+	 then if (#3 date1) < (#3 date2)
+	      then true
+	      else false
+	 else false
+    else false
+
+fun oldest (dates : (int*int*int) list) =
+    if null dates
+    then NONE
+    else
+	let val tl_ans = oldest(tl dates)
+	in if isSome tl_ans andalso is_older(valOf tl_ans, hd dates)
+	   then tl_ans
+	   else SOME (hd dates)
+	end
+
+fun number_in_month (dates : (int*int*int ) list, num_month : int) =
+    let
+	fun sum_of_list (xs: int list) =
+	    if null xs
+	    then 0
+	    else hd xs + sum_of_list(tl xs)
+	fun same_seconds_list (dates_to_check : (int*int*int) list, matching_month : int) =
+	    if null dates_to_check
+	    then []
+	    else if (#2(hd dates_to_check)) = matching_month
+	    then (#2(hd dates_to_check)) :: same_seconds_list(tl dates_to_check, matching_month)
+	    else same_seconds_list(tl dates_to_check, matching_month)
+    in
+	(sum_of_list(same_seconds_list(dates, num_month))) div num_month
+    end
+fun number_in_months (dates : (int*int*int) list, months_list : int list) =
+    if null months_list
+    then 0
+    else number_in_month (dates, hd months_list) + number_in_months (dates, tl months_list)
+
+fun dates_in_month (dates : (int*int*int) list, num_month : int) =
+    if null dates
+    then []
+    else if (#2(hd dates)) = num_month
+    then hd dates :: dates_in_month(tl dates, num_month)
+    else dates_in_month(tl dates, num_month)
+
+fun dates_in_months (dates : (int*int*int) list, num_month_list : int list) =
+    if null num_month_list
+    then []
+    else dates_in_month(dates, hd num_month_list) @ dates_in_months(dates, tl num_month_list)
+
+fun get_nth (strings : string list, n : int) =
+    if n = 1
+    then hd strings
+    else get_nth(tl strings, n-1)
+
+fun date_to_string (date : (int*int*int)) =
+    let fun month_list () =
+	    ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    in
+	get_nth(month_list(), #2 date)  ^ " " ^ Int.toString(#3 date) ^ ", " ^ Int.toString(#1 date)
+    end
+
+fun count_of_list (num_list : int list, counter : int) =
+    if null num_list
+    then counter
+    else count_of_list(tl num_list, counter + 1)
+
+fun number_before_reaching_sum (sum : int,  numbers : int list) =
+    let fun iterate (magic_num : int, numberz : int list) =
+	    if hd numberz >= magic_num
+	    then count_of_list(numbers, 0) - (count_of_list(tl numberz, 0) + 1)
+	    else iterate(magic_num - hd numberz, tl numberz)
+    in
+	iterate(sum, numbers)
+    end
+
+fun what_month (day_number : int) =
+    number_before_reaching_sum(day_number, [31,28,31,30,31,30,31,31,30,31,30,31]) + 1;
+
+fun what_months (day_nums : int list) =
+    if null day_nums
+    then []
+    else what_month(hd day_nums) :: what_months(tl day_nums)
+
+fun return_range (start_num : int, end_num : int) =
+    if start_num = end_num
+    then start_num::[]
+    else start_num :: return_range(start_num+1,end_num)
+
+fun month_range (day1 : int, day2 : int) =
+    if day1 > day2
+    then []
+    else what_months(return_range(day1,day2))
